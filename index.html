@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Lila: The Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1b2a; --panel:#132a3d; --ink:#eef4f2; --accent:#7fd858;
+    --accent2:#f2c94c; --danger:#e6553a; --water:#1b4d6b;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0d1b2a; } }
+  :root[data-theme="dark"]{ --bg:#0d1b2a; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Press Start 2P", monospace;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:14px 10px 26px; gap:8px; overflow-x:hidden;
+  }
+  h1{
+    font-size:clamp(14px,4vw,22px); text-align:center; margin:6px 0 0;
+    color:var(--accent2); text-shadow:2px 2px 0 #000; letter-spacing:1px;
+  }
+  .sub{ font-size:9px; opacity:.75; text-align:center; max-width:520px; line-height:1.8; }
+  #levelInfo{ font-size:9px; opacity:.85; text-align:center; max-width:512px; line-height:1.8; min-height:1.8em; color:#bcd; }
+  #stage{
+    position:relative; width:100%; max-width:512px; aspect-ratio: 512/448;
+    background:#000; border:6px solid #3a2f1c; border-radius:6px;
+    box-shadow:0 0 0 3px #6b5a33, 0 10px 30px rgba(0,0,0,.5);
+    image-rendering:pixelated; overflow:hidden;
+  }
+  canvas{ width:100%; height:100%; display:block; image-rendering:pixelated; }
+  #hud{
+    position:absolute; top:0; left:0; right:0; padding:5px 8px;
+    font-size:8px; color:#fff; display:flex; justify-content:space-between;
+    text-shadow:1px 1px 0 #000; pointer-events:none; z-index:5;
+  }
+  #overlay{
+    position:absolute; inset:0; background:rgba(4,10,16,.94);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:14px; gap:10px; z-index:10; overflow-y:auto;
+  }
+  #overlay.show{ display:flex; }
+  #overlay p{ font-size:9px; line-height:1.9; max-width:420px; }
+  #overlay .title{ font-size:15px; color:var(--accent2); text-shadow:2px 2px 0 #000; }
+  #overlay .bigsign{ font-size:18px; color:var(--accent2); text-shadow:2px 2px 0 #000; line-height:1.6; }
+  .portraits{ display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; justify-content:center; }
+  .portraits img{ width:56px; height:56px; image-rendering:pixelated; border:3px solid #223; border-radius:4px; background:#0e2233; }
+  button.nes{
+    font-family:"Press Start 2P", monospace; font-size:9px; color:#fff;
+    background:var(--water); border:3px solid #0a1f2c; border-bottom:6px solid #08161f;
+    padding:9px 14px; cursor:pointer; border-radius:2px;
+  }
+  button.nes:active{ border-bottom:3px solid #08161f; transform:translateY(3px); }
+  button.nes.alt{ background:#3a3020; }
+  .grid9{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; max-width:420px; }
+  .xcard{ background:#0e2233; border:2px solid #234; border-radius:4px; padding:5px; cursor:pointer; }
+  .xcard:hover{ border-color:var(--accent2); }
+  .xcard img{ width:44px; height:44px; image-rendering:pixelated; }
+  .xcard div{ font-size:7px; margin-top:3px; }
+  .rpsRow{ display:flex; gap:10px; }
+  .rpsRow button{ font-size:20px; width:56px; height:56px; }
+  .scoreTable{ font-size:8px; line-height:1.9; width:100%; max-width:340px; text-align:left; background:#0a1620; padding:8px; border-radius:4px; }
+  .scoreTable .row{ display:flex; justify-content:space-between; }
+  .scoreTable .final{ color:var(--accent2); border-top:1px solid #345; margin-top:6px; padding-top:6px; }
+  #controls{
+    display:flex; justify-content:space-between; align-items:center;
+    width:100%; max-width:512px; margin-top:2px; touch-action:none; user-select:none;
+  }
+  .dpad{ display:grid; grid-template-columns:repeat(3,42px); grid-template-rows:repeat(3,42px); gap:2px; }
+  .dpad button{ background:var(--panel); border:2px solid #000; color:#fff; font-size:14px; border-radius:4px; }
+  .dpad button:active{ background:var(--accent); }
+  #actionBtn{
+    width:74px; height:74px; border-radius:50%; background:var(--danger);
+    border:3px solid #000; color:#fff; font-size:9px; font-family:"Press Start 2P",monospace;
+  }
+  #actionBtn:active{ background:#ff7a5c; }
+  footer{ font-size:8px; opacity:.5; text-align:center; max-width:480px; line-height:1.8; }
+  @media (min-width:700px){ #controls{ display:none; } }
+</style>
+</head>
+<body>
+<h1>LILA: THE GAME</h1>
+<div class="sub">Una anguila, un villano, y muchos Xachis de por medio 🐟</div>
+<div id="levelInfo"></div>
+
+<div id="stage">
+  <canvas id="game" width="256" height="224"></canvas>
+  <div id="hud"></div>
+  <div id="overlay"><div id="overlayContent"></div></div>
+</div>
+
+<div id="controls">
+  <div class="dpad">
+    <div></div><button id="btnUp">▲</button><div></div>
+    <button id="btnLeft">◀</button><div></div><button id="btnRight">▶</button>
+    <div></div><button id="btnDown">▼</button><div></div>
+  </div>
+  <button id="actionBtn">ACCIÓN</button>
+</div>
+
+<footer>Hecho a pedido — pixel art generado en vivo, sin librerías externas.</footer>
+
+<script>
+(function(){
+"use strict";
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = cv.width, H = cv.height;
+const hud = document.getElementById('hud');
+const overlay = document.getElementById('overlay');
+const overlayContent = document.getElementById('overlayContent');
+const levelInfoEl = document.getElementById('levelInfo');
+function setLevelInfo(t){ levelInfoEl.textContent = t || ''; }
+
+/* ============ INPUT ============ */
+const input = { left:false,right:false,up:false,down:false,action:false };
+function setKey(k,v){
+  if(['ArrowLeft','a','A'].includes(k)) input.left=v;
+  if(['ArrowRight','d','D'].includes(k)) input.right=v;
+  if(['ArrowUp','w','W'].includes(k)) input.up=v;
+  if(['ArrowDown','s','S'].includes(k)) input.down=v;
+  if([' ','Enter','Spacebar'].includes(k)) input.action=v;
+}
+window.addEventListener('keydown', e=>{
+  setKey(e.key,true);
+  if(e.key===' ') e.preventDefault();
+  if(pendingAdvance && (e.key==='Enter'||e.key===' ')) advance();
+});
+window.addEventListener('keyup', e=> setKey(e.key,false));
+function bindHold(id, prop){
+  const el = document.getElementById(id);
+  const on=(e)=>{ e.preventDefault(); input[prop]=true; };
+  const off=(e)=>{ e.preventDefault(); input[prop]=false; };
+  el.addEventListener('touchstart',on,{passive:false});
+  el.addEventListener('touchend',off,{passive:false});
+  el.addEventListener('mousedown',on);
+  el.addEventListener('mouseup',off);
+  el.addEventListener('mouseleave',off);
+}
+bindHold('btnLeft','left'); bindHold('btnRight','right');
+bindHold('btnUp','up'); bindHold('btnDown','down');
+document.getElementById('actionBtn').addEventListener('touchstart', e=>{e.preventDefault(); input.action=true; if(pendingAdvance) advance();},{passive:false});
+document.getElementById('actionBtn').addEventListener('touchend', e=>{e.preventDefault(); input.action=false;},{passive:false});
+document.getElementById('actionBtn').addEventListener('click', ()=>{ if(pendingAdvance) advance(); });
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay && pendingAdvance) advance(); });
+
+/* ============ PIXEL SPRITE ENGINE ============ */
+function buildSprite(rows, palette, w, h){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const g = c.getContext('2d');
+  for(let y=0;y<h;y++){
+    const row = (rows[y]||'');
+    for(let x=0;x<w;x++){
+      const ch = row[x];
+      const col = ch ? palette[ch] : null;
+      if(col){ g.fillStyle=col; g.fillRect(x,y,1,1); }
+    }
+  }
+  return c;
+}
+function drawSprite(gctx, img, x, y, scale, flip){
+  gctx.save();
+  gctx.translate(Math.round(x), Math.round(y));
+  if(flip){ gctx.translate(img.width*scale,0); gctx.scale(-1,1); }
+  gctx.drawImage(img,0,0,img.width*scale, img.height*scale);
+  gctx.restore();
+}
+function setChar(str,i,c){ return str.substring(0,i)+c+str.substring(i+1); }
+function applyExtras(rows, extras){
+  extras.forEach(([x,y,ch])=>{ if(rows[y]!==undefined) rows[y]=setChar(rows[y],x,ch); });
+  return rows;
+}
+function humanRows(o){
+  const hx0=o.hairWide?1:3, hx1=o.hairWide?14:12;
+  const rows = [];
+  for(let y=0;y<18;y++){
+    let r = '';
+    for(let x=0;x<16;x++){
+      let ch='.';
+      if(y<=1 && x>=hx0 && x<=hx1) ch='H';
+      else if(y>=2 && y<=3 && x>=hx0 && x<=hx1) ch='H';
+      else if(y>=4 && y<=7 && x>=4 && x<=11) ch='S';
+      else if(y===9 && x>=6 && x<=9) ch='S';
+      else if(y>=10 && y<=13 && x>=4 && x<=11) ch='T';
+      else if(y>=14 && y<=15 && x>=5 && x<=10) ch='P';
+      else if(y===16 && x>=4 && x<=6) ch='B';
+      else if(y===16 && x>=9 && x<=11) ch='B';
+      r += ch;
+    }
+    rows.push(r);
+  }
+  rows[5] = setChar(rows[5],6,'E'); rows[5]=setChar(rows[5],9,'E');
+  return rows;
+}
+function makeHuman(o){
+  const pal = { H:o.hair, S:o.skin, T:o.shirt||'#3a5a7a', P:o.pants||'#25303c', B:o.shoe||'#241a10', E:o.eye||'#101010' };
+  let rows = humanRows({hairWide:o.hairWide});
+  if(o.bald){ pal.H = o.skin; }
+  if(o.hairLong){
+    rows = applyExtras(rows,[[2,4,'H'],[2,5,'H'],[2,6,'H'],[2,7,'H'],[13,4,'H'],[13,5,'H'],[13,6,'H'],[13,7,'H']]);
+  }
+  if(o.beard){
+    pal.F = o.beardColor||o.hair;
+    let ext=[[4,7,'F'],[5,7,'F'],[6,7,'F'],[7,7,'F'],[8,7,'F'],[9,7,'F'],[10,7,'F'],[11,7,'F']];
+    if(!o.beardShort) ext = ext.concat([[5,8,'F'],[6,8,'F'],[7,8,'F'],[8,8,'F'],[9,8,'F'],[10,8,'F']]);
+    if(o.beardThick) ext = ext.concat([[5,9,'F'],[6,9,'F'],[9,9,'F'],[10,9,'F']]);
+    rows = applyExtras(rows, ext);
+  }
+  if(o.mustache){
+    pal.M = o.mustacheColor||o.hair;
+    rows = applyExtras(rows,[[6,7,'M'],[7,7,'M'],[8,7,'M'],[9,7,'M']]);
+  }
+  if(o.glasses){
+    pal.D='#101010';
+    rows = applyExtras(rows,[[4,5,'D'],[5,5,'D'],[6,5,'D'],[7,5,'D'],[8,5,'D'],[9,5,'D'],[10,5,'D'],[11,5,'D']]);
+  }
+  if(o.extras) rows = applyExtras(rows, o.extras);
+  return buildSprite(rows, pal, 16, 18);
+}
+
+/* main cast */
+const likas = makeHuman({ hair:'#141414', skin:'#7a4a28', shirt:'#c0392b', pants:'#2c3e50', hairWide:true });
+function makePato(){
+  const rows = humanRows({hairWide:true});
+  applyExtras(rows,[[4,5,'D'],[5,5,'D'],[6,5,'D'],[7,5,'D'],[8,5,'D'],[9,5,'D'],[10,5,'D'],[11,5,'D']]);
+  applyExtras(rows,[[4,7,'F'],[5,7,'F'],[6,7,'F'],[7,7,'F'],[8,7,'F'],[9,7,'F'],[10,7,'F'],[11,7,'F'],[5,8,'F'],[6,8,'F'],[7,8,'F'],[8,8,'F'],[9,8,'F'],[10,8,'F']]);
+  const cap=[]; for(let x=1;x<=14;x++){ cap.push([x,0,'C']); cap.push([x,1,'C']); }
+  for(let x=2;x<=13;x++) cap.push([x,2,'C']);
+  for(let x=1;x<=14;x++) cap.push([x,3,'K']);
+  applyExtras(rows,cap);
+  const pal = { H:'#6b4423', S:'#f2c9a0', T:'#3a8f4a', P:'#3d3020', B:'#241a10', E:'#101010', D:'#101010', F:'#4a2f18', C:'#b6321f', K:'#7a1f18' };
+  return buildSprite(rows, pal, 16, 18);
+}
+const patoSprite = makePato();
+
+/* the 9 Xachis */
+const XACHIS = [
+  { id:'pipo', name:'Pipo', sprite: makeHuman({hair:'#6b4423', skin:'#f2c9a0', beard:true, beardShort:true, glasses:true}) },
+  { id:'facu', name:'Facu', sprite: makeHuman({hair:'#6b4423', skin:'#7a4a28', beard:true}) , special:'Has elegido al hermano de Kida'},
+  { id:'marto', name:'Marto', sprite: makeHuman({hair:'#e8c96b', skin:'#f6d7b0', eye:'#3fa9e0'}) },
+  { id:'maxi', name:'Maxi', sprite: makeHuman({hair:'#f6d7b0', skin:'#f6d7b0', bald:true, beard:true, beardThick:true}) },
+  { id:'pablito', name:'Pablito', sprite: makeHuman({hair:'#141414', skin:'#f2c9a0', beard:true, beardShort:true}) },
+  { id:'joaco', name:'Joaco', sprite: makeHuman({hair:'#6b4423', skin:'#f2c9a0', hairLong:true, glasses:true}) },
+  { id:'alex', name:'Alex', sprite: makeHuman({hair:'#4a3222', skin:'#f6d7b0'}) },
+  { id:'nico', name:'Nico', sprite: makeHuman({hair:'#6b4423', skin:'#f6d7b0', hairLong:true}) },
+  { id:'cantarini', name:'Cantarini', sprite: makeHuman({hair:'#141414', skin:'#f6d7b0', mustache:true}) }
+];
+let selectedXachi = null;
+
+/* eel */
+function drawEel(gctx, x, y, t, scale, flip, dim){
+  const segCount = 7, segLen = 5*scale;
+  gctx.save(); gctx.translate(x,y); if(flip) gctx.scale(-1,1);
+  for(let i=segCount-1;i>=0;i--){
+    const phase = t*0.18 - i*0.7;
+    const wob = Math.sin(phase)*(3*scale);
+    const sx=-i*segLen, sy=wob;
+    const w=(i===0)?7*scale:Math.max(3*scale,6*scale-i*0.4*scale);
+    const h=w*0.72;
+    gctx.fillStyle = dim?'#2b5a1f':(i%2===0?'#5fae3d':'#4f9a33');
+    gctx.fillRect(sx-w/2, sy-h/2, w, h);
+    if(i===0){
+      gctx.fillStyle = dim?'#7a7020':'#e8d24a';
+      gctx.fillRect(sx-w/2, sy+h*0.15, w, h*0.35);
+      gctx.fillStyle='#101010';
+      gctx.fillRect(sx+w*0.15, sy-h*0.25, scale*1.6, scale*1.6);
+    }
+  }
+  gctx.restore();
+}
+function emoji(gctx, ch, x, y, size){
+  gctx.font = size+'px sans-serif'; gctx.textAlign='center'; gctx.textBaseline='middle';
+  gctx.fillText(ch, x, y);
+}
+function rectsOverlap(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+
+/* ============ SCENE / PORTRAIT HELPERS ============ */
+function portraitDataUrl(spriteImg, size){
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const g=c.getContext('2d'); g.imageSmoothingEnabled=false;
+  g.fillStyle='#0e2233'; g.fillRect(0,0,size,size);
+  g.drawImage(spriteImg,(size-16*3)/2,(size-18*3)/2+4,16*3,18*3);
+  return c.toDataURL();
+}
+function sceneDataUrl(w,h,drawFn){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d'); g.imageSmoothingEnabled=false;
+  drawFn(g,w,h);
+  return c.toDataURL();
+}
+
+/* ============ DIALOGUE / OVERLAY SYSTEM ============ */
+let pendingAdvance = null;
+function showStory(portraits, text, buttonLabel, cb){
+  overlay.classList.add('show');
+  const pr = portraits.map(p=>portraitDataUrl(p,56));
+  overlayContent.innerHTML = `
+    <div class="portraits">${pr.map(src=>`<img src="${src}">`).join('')}</div>
+    <p>${text}</p>
+    <button class="nes" id="advBtn">${buttonLabel}</button>
+  `;
+  pendingAdvance = cb;
+  document.getElementById('advBtn').onclick = ()=>advance();
+}
+function showBigSign(text, cb){
+  overlay.classList.add('show');
+  overlayContent.innerHTML = `<div class="bigsign">${text}</div><button class="nes" id="advBtn">Continuar</button>`;
+  pendingAdvance = cb;
+  document.getElementById('advBtn').onclick = ()=>advance();
+}
+function advance(){
+  if(!pendingAdvance) return;
+  const cb = pendingAdvance; pendingAdvance=null;
+  overlay.classList.remove('show');
+  cb();
+}
+
+/* ============ SCORING / MODE SYSTEM ============ */
+let mode='normal';
+let lives=3;
+let totalScore=0;
+let levelScores=[];
+let levelStartTime=0;
+
+function initGameState(){
+  totalScore=0; levelScores=[];
+  lives = (mode==='hardcore')?1:3;
+}
+function resetLivesForLevel(){
+  if(mode==='normal') lives=3;
+  // survival/hardcore: lives persist across levels
+}
+function beginLevelTimer(){ levelStartTime=performance.now(); }
+function recordLevelScore(name){
+  const timeMs = performance.now()-levelStartTime;
+  const base=100;
+  const livesBonus = Math.max(0,lives)*30;
+  const speedBonus = Math.max(0, Math.round(500 - timeMs/60));
+  const pts = base+livesBonus+speedBonus;
+  totalScore += pts;
+  levelScores.push({ name, pts, timeS:(timeMs/1000).toFixed(1), livesLeft:Math.max(0,lives) });
+  return pts;
+}
+function loseLife(onZero){
+  lives--;
+  if(lives<=0){ onZero(); return true; }
+  return false;
+}
+function modeMultiplier(){ return mode==='hardcore'?2:(mode==='survival'?1.5:1); }
+
+function showEndScreen(titleText, paragraph, imgUrl, cb){
+  overlay.classList.add('show');
+  const rows = levelScores.map(l=>`<div class="row"><span>${l.name}</span><span>+${l.pts} (${l.timeS}s, ❤${l.livesLeft})</span></div>`).join('');
+  const mult = modeMultiplier();
+  const finalTotal = Math.round(totalScore*mult);
+  overlayContent.innerHTML = `
+    <div class="title">${titleText}</div>
+    ${imgUrl?`<img src="${imgUrl}" style="width:112px;height:112px;image-rendering:pixelated;border:3px solid #223;border-radius:4px;background:#0e2233">`:''}
+    <p>${paragraph}</p>
+    <div class="scoreTable">
+      ${rows || '<div class="row"><span>Sin niveles completados</span><span></span></div>'}
+      <div class="row"><span>Subtotal</span><span>${totalScore}</span></div>
+      <div class="row"><span>Modo: ${mode} (x${mult})</span><span></span></div>
+      <div class="row final"><span>PUNTAJE FINAL</span><span>${finalTotal}</span></div>
+    </div>
+    <button class="nes" id="advBtn">Jugar de nuevo</button>
+  `;
+  pendingAdvance = cb;
+  document.getElementById('advBtn').onclick=()=>advance();
+}
+
+/* ============ BACKGROUNDS ============ */
+function drawWater(gctx, scrollOffset){
+  gctx.fillStyle='#123a55'; gctx.fillRect(0,0,W,H);
+  gctx.fillStyle='#1b4d6b';
+  for(let i=0;i<8;i++){
+    const yy=(i*30+(scrollOffset||0))%(H+30)-30;
+    gctx.fillRect(0,yy,W,4);
+  }
+}
+function drawBank(gctx){
+  gctx.fillStyle='#3a6b2f'; gctx.fillRect(0,H-24,W,24);
+  gctx.fillStyle='#2c5522'; gctx.fillRect(0,H-24,W,4);
+}
+
+/* ============ TITLE / MODE SELECT ============ */
+let state='title';
+let raf=null;
+function setHud(t){ hud.innerHTML=t||''; }
+
+function loopTitle(){
+  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+  drawWater(ctx,0); drawBank(ctx);
+  const t=performance.now()/1000;
+  drawEel(ctx, 60, 70+Math.sin(t)*10, t*60, 2.2, false, false);
+  drawSprite(ctx, patoSprite, 150, H-24-18*2, 2, false);
+  drawSprite(ctx, likas, 205, H-24-16*2, 2, false);
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#f2c94c'; ctx.font='13px monospace'; ctx.textAlign='center';
+  ctx.fillText('LILA: THE GAME', W/2, H/2-20);
+  ctx.fillStyle='#fff'; ctx.font='8px monospace';
+  ctx.fillText('Toca la pantalla o ENTER para empezar', W/2, H/2+6);
+  setHud(''); setLevelInfo('');
+  if(state==='title') raf=requestAnimationFrame(loopTitle);
+}
+document.getElementById('game').addEventListener('click', ()=>{ if(state==='title') chooseMode(); });
+window.addEventListener('keydown', e=>{ if(state==='title' && (e.key==='Enter'||e.key===' ')) chooseMode(); });
+
+function chooseMode(){
+  state='modeselect';
+  overlay.classList.add('show');
+  overlayContent.innerHTML = `
+    <div class="title">ELEGÍ EL MODO</div>
+    <p>Normal: 3 vidas por nivel.<br>Supervivencia: 3 vidas para TODO el juego.<br>Hardcore: 1 sola vida, sin margen de error.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="nes" id="mNormal">NORMAL</button>
+      <button class="nes alt" id="mSurvival">SUPERVIVENCIA</button>
+      <button class="nes alt" id="mHardcore">HARDCORE</button>
+    </div>
+  `;
+  document.getElementById('mNormal').onclick=()=>{ mode='normal'; pickedMode(); };
+  document.getElementById('mSurvival').onclick=()=>{ mode='survival'; pickedMode(); };
+  document.getElementById('mHardcore').onclick=()=>{ mode='hardcore'; pickedMode(); };
+}
+function pickedMode(){
+  overlay.classList.remove('show');
+  initGameState();
+  showStory([patoSprite],
+    "Lila era una joven anguila que vivía tranquila en su pecera. Hasta que un día, el villano Pato decidió cazarla para meterla en un bidón de nafta...",
+    "Empezar",
+    startLevel1);
+}
+
+/* ============ LEVEL 1: LA CAZA EN LA PECERA ============ */
+function startLevel1(){
+  state='level1'; resetLivesForLevel(); beginLevelTimer();
+  setLevelInfo('Nivel 1 — Manejá la mano y atrapá a Lila dentro de la pecera. Evitá los corales y los otros peces: cada choque te cuesta una vida. Si perdés todas, Lila logra escapar.');
+  const bounds={x:20,y:30,w:W-40,h:H-70};
+  const hand={x:W/2,y:bounds.y+20,w:14,h:14};
+  let eel={x:60,y:100,vx:1.4,vy:1.0};
+  const corals=[{x:50,y:bounds.y+bounds.h-30,w:20,h:22},{x:150,y:bounds.y+bounds.h-26,w:24,h:20},{x:210,y:bounds.y+20,w:18,h:20}];
+  const fish=[{x:90,y:60,vx:1.3},{x:180,y:150,vx:-1.1}];
+  let caught=false;
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    drawWater(ctx, performance.now()/30);
+    drawBank(ctx);
+    corals.forEach(c=> emoji(ctx,'🪸', c.x+c.w/2, c.y+c.h/2, 22));
+    fish.forEach(f=>{ f.x+=f.vx; if(f.x<bounds.x+10||f.x>bounds.x+bounds.w-10) f.vx*=-1; emoji(ctx,'🐠', f.x, f.y, 16); });
+
+    const spd=2.1;
+    if(input.left) hand.x-=spd; if(input.right) hand.x+=spd;
+    if(input.up) hand.y-=spd; if(input.down) hand.y+=spd;
+    hand.x=Math.max(bounds.x,Math.min(bounds.x+bounds.w-hand.w,hand.x));
+    hand.y=Math.max(bounds.y,Math.min(bounds.y+bounds.h-hand.h,hand.y));
+
+    eel.x+=eel.vx; eel.y+=eel.vy;
+    if(eel.x<bounds.x+10||eel.x>bounds.x+bounds.w-10) eel.vx*=-1;
+    if(eel.y<bounds.y+10||eel.y>bounds.y+bounds.h-10) eel.vy*=-1;
+    if(Math.random()<0.01) eel.vx+=(Math.random()-0.5)*0.6;
+    if(Math.random()<0.01) eel.vy+=(Math.random()-0.5)*0.6;
+    eel.vx=Math.max(-2,Math.min(2,eel.vx)); eel.vy=Math.max(-2,Math.min(2,eel.vy));
+    drawEel(ctx, eel.x, eel.y, performance.now()/16, 1.5, eel.vx<0, false);
+
+    emoji(ctx,'🖐️', hand.x+7, hand.y+7, 20);
+
+    const handBox={x:hand.x,y:hand.y,w:hand.w,h:hand.h};
+    if(!caught && rectsOverlap(handBox,{x:eel.x-8,y:eel.y-6,w:16,h:12})){
+      caught=true;
+      const pts=recordLevelScore('Nivel 1 — La caza');
+      setTimeout(()=>{ showStory([patoSprite],
+        `¡Pato atrapó a Lila! (+${pts} puntos) Ahora tiene que decidir a cuál de sus amigos Xachis se la va a regalar...`,
+        "Elegir Xachi", startXachiSelect); },150);
+    }
+    let hit=false;
+    corals.forEach(c=>{ if(rectsOverlap(handBox,c)) hit=true; });
+    fish.forEach(f=>{ if(rectsOverlap(handBox,{x:f.x-8,y:f.y-6,w:16,h:12})) hit=true; });
+    if(hit && !caught){
+      hand.x=W/2; hand.y=bounds.y+20;
+      const dead = loseLife(()=>{
+        const img = sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#123a55'; g.fillRect(0,0,w,h); emoji(g,'🐟',w/2-18,h/2,42); emoji(g,'💨',w/2+22,h/2-14,26); emoji(g,'😤',w/2,20,26); });
+        state='over';
+        showEndScreen('¡LILA ESCAPÓ!', 'Pato falló demasiadas veces y Lila logró escabullirse entre los corales. Se queda viviendo libre en la pecera, a salvo del villano. Fin del juego.', img, backToTitle);
+      });
+      if(dead) return;
+    }
+    setHud(`<span>🎣 ATRAPÁ A LILA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
+    if(state==='level1') raf=requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* ============ XACHI SELECTION ============ */
+function startXachiSelect(){
+  state='xachiselect'; setLevelInfo('Elegí a qué Xachi le va a regalar Pato a Lila.');
+  overlay.classList.add('show');
+  const cards = XACHIS.map(x=>`
+    <div class="xcard" data-id="${x.id}">
+      <img src="${portraitDataUrl(x.sprite,44)}">
+      <div>${x.name}</div>
+    </div>`).join('');
+  overlayContent.innerHTML = `<div class="title" style="font-size:12px">¿A quién se la regala?</div><div class="grid9">${cards}</div>`;
+  overlayContent.querySelectorAll('.xcard').forEach(el=>{
+    el.onclick = ()=>{
+      const x = XACHIS.find(v=>v.id===el.dataset.id);
+      selectedXachi = x;
+      overlay.classList.remove('show');
+      const sign = x.special ? x.special : `Has elegido a... ${x.name}`;
+      showBigSign(sign, startLevel3);
+    };
+  });
+}
+
+/* ============ LEVEL 3: PATO CORRE Y SALTA PARA ENTREGAR A LILA ============ */
+function startLevel3(){
+  state='level3'; resetLivesForLevel(); beginLevelTimer();
+  setLevelInfo('Nivel 2 — Pato tiene que superar el camino saltando obstáculos para llegar y entregarle Lila a ' + selectedXachi.name + '. Si se queda sin vidas, Lila no lo cuenta.');
+  let distance=0, target=900, groundX=0;
+  let patoY=H-24-18*2, vy=0, onGround=true;
+  const obstacles=[]; let spawnTimer=0;
+  function loop(){
+    ctx.fillStyle='#79c6f2'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#cdeafe'; ctx.fillRect(0,H-60,W,20);
+    drawBank(ctx);
+    groundX-=2.4; distance+=2.4;
+    spawnTimer--;
+    if(spawnTimer<=0){ obstacles.push({x:W+10,w:12,h:16}); spawnTimer=70+Math.random()*40; }
+    if(input.up||input.action){ if(onGround){ vy=-6.4; onGround=false; } }
+    vy+=0.36; patoY+=vy;
+    const groundY=H-24-18*2;
+    if(patoY>=groundY){ patoY=groundY; vy=0; onGround=true; }
+
+    obstacles.forEach(o=>o.x-=2.4);
+    while(obstacles.length && obstacles[0].x<-20) obstacles.shift();
+    obstacles.forEach(o=>{ ctx.fillStyle='#8a5a2a'; ctx.fillRect(o.x,H-24-o.h,o.w,o.h); ctx.fillStyle='#6b431e'; ctx.fillRect(o.x,H-24-o.h,o.w,3); });
+
+    drawSprite(ctx, patoSprite, 60, patoY, 2, false);
+    ctx.fillStyle='#bfe8ff'; ctx.fillRect(60+34,patoY+8,14,10);
+    ctx.strokeStyle='#333'; ctx.strokeRect(60+34,patoY+8,14,10);
+    drawEel(ctx, 60+34+7, patoY+13, performance.now()/16, 0.6, false, false);
+
+    const patoBox={x:60,y:patoY,w:32,h:36};
+    obstacles.forEach(o=>{
+      if(rectsOverlap(patoBox,{x:o.x,y:H-24-o.h,w:o.w,h:o.h})){
+        o.x=-999;
+        const dead=loseLife(()=>{
+          state='over';
+          const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'😢',w/2,h/2-10,44); emoji(g,'🐟',w/2,h/2+30,26); });
+          showEndScreen('LILA MURIÓ 😢', 'Pato tropezó una vez de más en el camino. Lila no llegó a destino. Fin del juego.', img, backToTitle);
+        });
+        distance=Math.max(0,distance-120);
+      }
+    });
+
+    if(distance>=target){
+      const pts=recordLevelScore('Nivel 2 — El camino');
+      state='story';
+      showStory([patoSprite, selectedXachi.sprite],
+        `Pato logró llegar y le entregó a Lila a ${selectedXachi.name}. (+${pts} puntos) Pero ${selectedXachi.name} no la quiere gratis: quiere jugar piedra, papel o tijera contra Likas para ver quién se la queda.`,
+        "Jugar RPS", startRPS);
+      return;
+    }
+    setHud(`<span>🏃 ${selectedXachi.name.toUpperCase()} ESPERA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
+    if(state==='level3') raf=requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* ============ LEVEL 4: PIEDRA, PAPEL O TIJERA (mejor de 3) ============ */
+function startRPS(){
+  state='rps'; beginLevelTimer();
+  setLevelInfo('Piedra, papel o tijera contra Likas — mejor de 3 rondas. Si ganás 2 rondas, Likas se lleva a Lila.');
+  let wins=0, losses=0, round=1;
+  const OPTS = [{k:'rock',e:'🪨',beats:'scissors'},{k:'paper',e:'📄',beats:'rock'},{k:'scissors',e:'✂️',beats:'paper'}];
+  drawRoundUI();
+  function drawRoundUI(){
+    ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,W,H);
+    drawSprite(ctx, likas, W-70, H/2-40, 2.4, true);
+    ctx.fillStyle='#fff'; ctx.font='9px monospace'; ctx.textAlign='center';
+    ctx.fillText(`RONDA ${round}  —  Vos ${wins} / Likas ${losses}`, W/2, 24);
+    setHud(`<span>✊ VS LIKAS</span><span>⭐ ${totalScore}</span>`);
+    overlay.classList.add('show');
+    overlayContent.innerHTML = `
+      <div class="title" style="font-size:12px">Elegí tu jugada</div>
+      <div class="rpsRow">
+        <button class="nes" data-k="rock">🪨</button>
+        <button class="nes" data-k="paper">📄</button>
+        <button class="nes" data-k="scissors">✂️</button>
+      </div>
+    `;
+    overlayContent.querySelectorAll('button').forEach(b=> b.onclick = ()=> resolveRound(b.dataset.k));
+  }
+  function resolveRound(playerK){
+    const likasK = OPTS[Math.floor(Math.random()*3)].k;
+    if(playerK===likasK){
+      overlayContent.querySelector('.title').textContent = 'Empate — de nuevo';
+      setTimeout(drawRoundUI, 500);
+      return;
+    }
+    const pObj = OPTS.find(o=>o.k===playerK);
+    const playerWon = pObj.beats===likasK;
+    if(playerWon) wins++; else losses++;
+    overlay.classList.remove('show');
+    const emo = {rock:'🪨',paper:'📄',scissors:'✂️'};
+    const roundText = `Vos: ${emo[playerK]}  vs  Likas: ${emo[likasK]} — ${playerWon?'¡Ganaste la ronda!':'Perdiste la ronda.'}`;
+    if(wins>=2 || losses>=2){
+      finishMatch(wins,losses, roundText);
+    } else {
+      showStory([likas], roundText, 'Siguiente ronda', ()=>{ round++; drawRoundUI(); });
+    }
+  }
+  function finishMatch(w,l,lastRoundText){
+    if(w>l){
+      const clean = (w===2 && l===0);
+      const pts = 150 + (clean?100:0);
+      totalScore += pts;
+      levelScores.push({ name:'RPS vs Likas', pts, timeS:((performance.now()-levelStartTime)/1000).toFixed(1), livesLeft:Math.max(0,lives) });
+      showStory([likas], `${lastRoundText} Ganaste la mejor de 3 (${w}-${l}). (+${pts} puntos) Likas se lleva a Lila a vivir a su casa.`,
+        "Continuar", startSnakeLevel);
+    } else {
+      state='over';
+      const img = sceneDataUrl(140,140,(g,w2,h2)=>{
+        g.fillStyle='#123a55'; g.fillRect(0,0,w2,h2);
+        g.drawImage(selectedXachi.sprite, w2/2-38, 30, 16*3, 18*3);
+        emoji(g,'❌',w2/2-38+24,30+27,20); emoji(g,'❌',w2/2-38+24,30+27,20);
+        emoji(g,'🔪',w2/2+18,h2/2, 30);
+      });
+      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila salta fuera de la pecera y no vuelven a ver a ${selectedXachi.name}. Fin del juego.`, img, backToTitle);
+    }
+  }
+}
+
+/* ============ LEVEL 5: SNAKE — LILA SE ALIMENTA PARA ESCONDERSE ============ */
+function startSnakeLevel(){
+  state='snake'; resetLivesForLevel(); beginLevelTimer();
+  setLevelInfo('Nivel 3 — Lila tiene que comer para hibernar y esconderse. Llegá a 100 puntos (cada comida vale 5). Cuanto más larga, más fácil comerte a vos misma.');
+  const cell=8, cols=Math.floor(W/cell), rows=Math.floor(H/cell);
+  let snake=[{x:Math.floor(cols/2),y:Math.floor(rows/2)},{x:Math.floor(cols/2)-1,y:Math.floor(rows/2)},{x:Math.floor(cols/2)-2,y:Math.floor(rows/2)}];
+  let dir={x:1,y:0}, nextDir={x:1,y:0};
+  let food=spawnFood();
+  let score=0, tick=0, speedDiv=7;
+  function spawnFood(){
+    let f;
+    do{ f={x:Math.floor(Math.random()*cols), y:Math.floor(Math.random()*rows)}; }
+    while(snake.some(s=>s.x===f.x&&s.y===f.y));
+    return f;
+  }
+  function loop(){
+    if(input.left && dir.x!==1) nextDir={x:-1,y:0};
+    else if(input.right && dir.x!==-1) nextDir={x:1,y:0};
+    else if(input.up && dir.y!==1) nextDir={x:0,y:-1};
+    else if(input.down && dir.y!==-1) nextDir={x:0,y:1};
+
+    tick++;
+    if(tick%speedDiv===0){
+      dir=nextDir;
+      const head={x:(snake[0].x+dir.x+cols)%cols, y:(snake[0].y+dir.y+rows)%rows};
+      if(snake.some(s=>s.x===head.x&&s.y===head.y)){
+        state='over';
+        const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
+        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas tijeras y se escapó. Nunca más la volvieron a ver. Fin del juego.', img, backToTitle);
+        return;
+      }
+      snake.unshift(head);
+      if(head.x===food.x && head.y===food.y){
+        score+=5; food=spawnFood();
+        if(speedDiv>4 && score%20===0) speedDiv--;
+      } else {
+        snake.pop();
+      }
+    }
+    ctx.fillStyle='#0d2a1a'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#123a24'; ctx.fillRect(0,0,cols*cell,rows*cell);
+    ctx.fillStyle='#f2c94c'; ctx.fillRect(food.x*cell,food.y*cell,cell,cell);
+    snake.forEach((s,i)=>{ ctx.fillStyle= i===0? '#e8d24a':'#5fae3d'; ctx.fillRect(s.x*cell+1,s.y*cell+1,cell-2,cell-2); });
+
+    setHud(`<span>🐍 LILA SE ESCONDE</span><span>${score}/100 · ⭐ ${totalScore}</span>`);
+    if(score>=100){
+      const pts=recordLevelScore('Nivel 3 — Esconderse');
+      state='story';
+      showStory([likas], `¡Lila comió suficiente y logró esconderse! Likas cree que la perdió para siempre. (+${pts} puntos)`,
+        "Continuar", startFinalLevel);
+      return;
+    }
+    if(state==='snake') raf=requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* ============ LEVEL 6: EL CAMINO A LA LAGUNA ============ */
+function startFinalLevel(){
+  state='final'; resetLivesForLevel(); beginLevelTimer();
+  setLevelInfo('Nivel 4 — Dos semanas después, Likas decide devolver a Lila a la naturaleza. Esquivá lo que caiga desde arriba en el camino al corredor aeróbico hasta llegar a la laguna.');
+  const lanes=[40,W/2-8,W-56];
+  let laneIdx=1, cooldown=0;
+  const items=[]; let spawnTimer=0, progress=0, target=1000;
+  const EMOJIS=['🧍','💃','🚬','💻','📱','🍺','👠','☎️'];
+  function loop(){
+    progress += 2.3;
+    ctx.fillStyle='#2c5522'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#3a6b2f'; ctx.fillRect(lanes[0]-10,0,W-(lanes[0]-10)*2,H);
+    for(let i=0;i<3;i++) ctx.fillRect(0,0,0,0);
+
+    cooldown--;
+    if(cooldown<=0){
+      if(input.left && laneIdx>0){ laneIdx--; cooldown=10; }
+      else if(input.right && laneIdx<lanes.length-1){ laneIdx++; cooldown=10; }
+    }
+    spawnTimer--;
+    if(spawnTimer<=0){
+      items.push({lane:Math.floor(Math.random()*lanes.length), y:-20, e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)]});
+      spawnTimer=42+Math.random()*24;
+    }
+    items.forEach(it=> it.y += 2.6+progress*0.001 );
+    items.forEach(it=> emoji(ctx, it.e, lanes[it.lane]+16, it.y, 22) );
+    while(items.length && items[0].y>H+20) items.shift();
+
+    const likasY=H-60;
+    drawSprite(ctx, likas, lanes[laneIdx], likasY, 2.2, false);
+    drawEel(ctx, lanes[laneIdx]+34, likasY+20, performance.now()/16, 0.7, false, false);
+
+    for(let i=items.length-1;i>=0;i--){
+      const it=items[i];
+      if(it.lane===laneIdx && it.y>likasY-4 && it.y<likasY+40){
+        items.splice(i,1);
+        const dead = loseLife(()=>{
+          state='over';
+          const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#12071a'; g.fillRect(0,0,w,h); emoji(g,'😈',w/2-18,h/2-6,42); emoji(g,'🏢',w/2+22,h/2+18,26); });
+          showEndScreen('VENGANZA', 'Likas no llegó a la laguna. Lila se queda dueña del departamento y empieza a planear su venganza contra Pato. Fin.', img, backToTitle);
+        });
+        if(dead) return;
+      }
+    }
+
+    ctx.fillStyle='#0a1620'; ctx.fillRect(10,4,W-20,8);
+    ctx.fillStyle='#7fd858'; ctx.fillRect(10,4,(W-20)*Math.min(1,progress/target),8);
+    setHud(`<span>🌳 AL CORREDOR</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
+
+    if(progress>=target){
+      const pts=recordLevelScore('Nivel 4 — La laguna');
+      state='over';
+      const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#123a55'; g.fillRect(0,0,w,h); emoji(g,'🌊',w/2,h/2+14,40); emoji(g,'🐟',w/2-10,h/2-10,30); emoji(g,'😊',w/2+26,h/2-24,22); });
+      showEndScreen('LIBRE AL FIN', `Likas llegó a la laguna y liberó a Lila en el agua. Todos felices para siempre. (+${pts} puntos)`, img, backToTitle);
+      return;
+    }
+    if(state==='final') raf=requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function backToTitle(){ state='title'; loopTitle(); }
+
+loopTitle();
+})();
+</script>
+</body>
+</html>
