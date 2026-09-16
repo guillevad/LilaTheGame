@@ -305,9 +305,9 @@ function showStory(portraits, text, buttonLabel, cb){
   pendingAdvance = cb;
   document.getElementById('advBtn').onclick = ()=>advance();
 }
-function showBigSign(text, cb){
+function showBigSign(text, subtitle, cb){
   overlay.classList.add('show');
-  overlayContent.innerHTML = `<div class="bigsign">${text}</div><button class="nes" id="advBtn">Continuar</button>`;
+  overlayContent.innerHTML = `<div class="bigsign">${text}</div>${subtitle?`<p>${subtitle}</p>`:''}<button class="nes" id="advBtn">Continuar</button>`;
   pendingAdvance = cb;
   document.getElementById('advBtn').onclick = ()=>advance();
 }
@@ -429,7 +429,7 @@ function pickedMode(){
   overlay.classList.remove('show');
   initGameState();
   showStory([patoSprite],
-    "Lila era una joven anguila que vivía tranquila en su pecera. Hasta que un día, el villano Pato decidió cazarla para meterla en un bidón de nafta...",
+    "Lila era una joven anguila que vivía tranquila en su pecera. Hasta que un día, el villano Pato decidió cazarla para meterla en un bidón de nafta...<br><br>🎮 Cómo jugar: manejá la mano con las flechas (o los botones táctiles) y atrapá a Lila 3 VECES. Evitá los corales y los otros peces — cada choque te cuesta una vida.",
     "Empezar",
     startLevel1);
 }
@@ -489,7 +489,7 @@ function startLevel1(){
         caught=true;
         const pts=recordLevelScore('Nivel 1 — La caza');
         setTimeout(()=>{ showStory([patoSprite],
-          `¡Pato atrapó a Lila las ${CATCHES_NEEDED} veces! (+${pts} puntos) Ahora tiene que decidir a cuál de sus amigos Xachis se la va a regalar...`,
+          `¡Pato atrapó a Lila las ${CATCHES_NEEDED} veces! (+${pts} puntos) Ahora tiene que decidir a cuál de sus amigos Xachis se la va a regalar...<br><br>🎮 Tocá el retrato del Xachi que quieras elegir.`,
           "Elegir Xachi", startXachiSelect); },150);
       } else {
         totalScore += 25;
@@ -543,7 +543,7 @@ function startXachiSelect(){
       selectedXachi = x;
       overlay.classList.remove('show');
       const sign = x.special ? x.special : `Has elegido a... ${x.name}`;
-      showBigSign(sign, startLevel3);
+      showBigSign(sign, '🎮 Cómo jugar: mantené presionado ARRIBA o el botón de ACCIÓN para saltar. Esquivá los obstáculos y NO te caigas en los pozos. Al final del camino te espera una casita — entrá para completar el nivel.', startLevel3);
     };
   });
 }
@@ -551,11 +551,12 @@ function startXachiSelect(){
 /* ============ LEVEL 3: PATO CORRE, SALTA Y ESQUIVA POZOS ============ */
 function startLevel3(){
   state='level3'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 2 — Pato tiene que cruzar un camino largo lleno de obstáculos y POZOS para llegar y entregarle Lila a ' + selectedXachi.name + '. Saltá justo a tiempo: cuanto más avanzás, más rápido y más difícil se pone. Si se queda sin vidas, Lila no lo cuenta.');
+  setLevelInfo('Nivel 2 — Pato tiene que cruzar un camino largo lleno de obstáculos y POZOS para llegar a la casita de ' + selectedXachi.name + ' y entregarle a Lila. Saltá justo a tiempo: cuanto más avanzás, más rápido y más difícil se pone. Si se queda sin vidas, Lila no lo cuenta.');
   let distance=0, target=1900;
   const groundY=H-24-18*2;
   let patoY=groundY, vy=0, onGround=true;
   const hazards=[]; let spawnTimer=40;
+  let houseSpawned=false, house=null, arrived=false;
   function currentSpeed(){ return Math.min(4.6, 2.5 + distance/900); }
   function loop(){
     const speed = currentSpeed();
@@ -563,7 +564,10 @@ function startLevel3(){
     ctx.fillStyle='#cdeafe'; ctx.fillRect(0,H-60,W,20);
     distance+=speed;
     spawnTimer--;
-    if(spawnTimer<=0){
+    if(!houseSpawned && distance>=target-280){
+      houseSpawned=true;
+      house={x:W+50, w:26};
+    } else if(!houseSpawned && spawnTimer<=0){
       const isPit = Math.random()<0.4;
       if(isPit){ hazards.push({type:'pit', x:W+10, w:26+Math.random()*22}); }
       else { hazards.push({type:'block', x:W+10, w:12+Math.random()*8, h:14+Math.random()*20}); }
@@ -574,6 +578,7 @@ function startLevel3(){
 
     hazards.forEach(hz=>hz.x-=speed);
     while(hazards.length && hazards[0].x < -60) hazards.shift();
+    if(house && !arrived) house.x -= speed;
 
     const patoCenterX = 60+16;
     const overPit = hazards.some(hz=> hz.type==='pit' && patoCenterX>hz.x-4 && patoCenterX<hz.x+hz.w+4 );
@@ -594,6 +599,7 @@ function startLevel3(){
       gx+=10;
     }
     hazards.filter(h=>h.type==='block').forEach(o=>{ ctx.fillStyle='#8a5a2a'; ctx.fillRect(o.x,H-24-o.h,o.w,o.h); ctx.fillStyle='#6b431e'; ctx.fillRect(o.x,H-24-o.h,o.w,3); });
+    if(house){ emoji(ctx,'🏠', house.x+13, H-24-24, 40); }
 
     drawSprite(ctx, patoSprite, 60, patoY, 2, false);
     ctx.fillStyle='#bfe8ff'; ctx.fillRect(60+34,patoY+8,14,10);
@@ -622,15 +628,20 @@ function startLevel3(){
       }
     }
 
-    if(distance>=target){
-      const pts=recordLevelScore('Nivel 2 — El camino');
-      state='story';
-      showStory([patoSprite, selectedXachi.sprite],
-        `Pato logró llegar y le entregó a Lila a ${selectedXachi.name}. (+${pts} puntos) Pero a ${selectedXachi.name} no le interesa quedarse con ella ni loco, así que decide dársela directamente a Likas. Antes de eso, hay que resolverlo con piedra, papel o tijera.`,
-        "Jugar RPS", startRPS);
-      return;
+    if(house && !arrived){
+      const patoCenterX = 60+16;
+      if(house.x+13 <= patoCenterX+6){
+        arrived=true;
+        const pts=recordLevelScore('Nivel 2 — El camino');
+        state='story';
+        showStory([patoSprite, selectedXachi.sprite],
+          `Pato llegó a la casita de ${selectedXachi.name} y le entregó a Lila. (+${pts} puntos) Pero a ${selectedXachi.name} no le interesa quedarse con ella ni loco, así que decide dársela directamente a Likas.<br><br>🎮 Cómo jugar: elegí piedra, papel o tijera. Necesitás ganar 2 de las 3 rondas contra Likas para que se la lleve.`,
+          "Jugar RPS", startRPS);
+        return;
+      }
     }
-    setHud(`<span>🏃 ${selectedXachi.name.toUpperCase()} ESPERA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore} · ${Math.min(100,Math.floor(distance/target*100))}%</span>`);
+    const progressPct = Math.min(99, Math.floor(distance/target*100));
+    setHud(`<span>🏃 ${selectedXachi.name.toUpperCase()} ESPERA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore} · ${progressPct}%</span>`);
     if(state==='level3') raf=requestAnimationFrame(loop);
   }
   loop();
@@ -685,7 +696,7 @@ function startRPS(){
       const pts = 150 + (clean?100:0);
       totalScore += pts;
       levelScores.push({ name:'RPS vs Likas', pts, timeS:((performance.now()-levelStartTime)/1000).toFixed(1), livesLeft:Math.max(0,lives) });
-      showStory([likas], `${lastRoundText} Ganaste la mejor de 3 (${w}-${l}). (+${pts} puntos) Likas se lleva a Lila a vivir a su casa.`,
+      showStory([likas], `${lastRoundText} Ganaste la mejor de 3 (${w}-${l}). (+${pts} puntos) Likas se lleva a Lila a vivir a su casa.<br><br>🎮 Cómo jugar: manejá a Lila con las flechas, comé la comida amarilla hasta llegar a 120 puntos. No choques contra las paredes ni contra vos misma.`,
         "Continuar", startSnakeLevel);
     } else {
       state='over';
@@ -697,7 +708,7 @@ function startRPS(){
         emoji(g,'🐟', w2/2, h2/2+6, 30);
         g.drawImage(selectedXachi.sprite, w2-46, h2-46, 16*2, 18*2);
       });
-      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila sale de la pecera y asesina a ${selectedXachi.name}. Fin del juego.`, img, backToTitle);
+      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila sale de la pecera y no vuelven a ver a ${selectedXachi.name} nunca más. Fin del juego.`, img, backToTitle);
     }
   }
 }
@@ -732,7 +743,7 @@ function startSnakeLevel(){
       if(hitsWall || hitsSelf){
         state='over';
         const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
-        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con un frasco de porro y se escapó. Nunca más la volvieron a ver, tampoco a la marimba. Likas lo sigue contratando. Fin del juego.', img, backToTitle);
+        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas tijeras y se escapó. Nunca más la volvieron a ver. Fin del juego.', img, backToTitle);
         return;
       }
       snake.unshift(head);
@@ -752,7 +763,7 @@ function startSnakeLevel(){
     if(score>=TARGET){
       const pts=recordLevelScore('Nivel 3 — Esconderse');
       state='story';
-      showStory([likas], `¡Lila comió suficiente y logró esconderse! Likas cree que la perdió para siempre. (+${pts} puntos)`,
+      showStory([likas], `¡Lila comió suficiente y logró esconderse! Likas cree que la perdió para siempre. (+${pts} puntos)<br><br>🎮 Cómo jugar: movete entre los carriles con IZQUIERDA/DERECHA para esquivar lo que cae desde arriba. Llegá al final sin perder todas las vidas.`,
         "Continuar", startFinalLevel);
       return;
     }
