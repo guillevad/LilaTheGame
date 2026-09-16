@@ -70,12 +70,12 @@
     display:flex; justify-content:space-between; align-items:center;
     width:100%; max-width:512px; margin-top:2px; touch-action:none; user-select:none;
   }
-  .dpad{ display:grid; grid-template-columns:repeat(3,42px); grid-template-rows:repeat(3,42px); gap:2px; }
-  .dpad button{ background:var(--panel); border:2px solid #000; color:#fff; font-size:14px; border-radius:4px; }
+  .dpad{ display:grid; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:3px; }
+  .dpad button{ background:var(--panel); border:2px solid #000; color:#fff; font-size:22px; border-radius:4px; }
   .dpad button:active{ background:var(--accent); }
   #actionBtn{
-    width:74px; height:74px; border-radius:50%; background:var(--danger);
-    border:3px solid #000; color:#fff; font-size:9px; font-family:"Press Start 2P",monospace;
+    width:82px; height:82px; border-radius:50%; background:var(--danger);
+    border:3px solid #000; color:#fff; font-size:10px; font-family:"Press Start 2P",monospace;
   }
   #actionBtn:active{ background:#ff7a5c; }
   footer{ font-size:8px; opacity:.5; text-align:center; max-width:480px; line-height:1.8; }
@@ -324,6 +324,8 @@ let lives=3;
 let totalScore=0;
 let levelScores=[];
 let levelStartTime=0;
+let rpsAttempts=0;
+let snakeAttempts=0;
 
 function initGameState(){
   totalScore=0; levelScores=[];
@@ -635,8 +637,8 @@ function startLevel3(){
         const pts=recordLevelScore('Nivel 2 — El camino');
         state='story';
         showStory([patoSprite, selectedXachi.sprite],
-          `Pato llegó a la casita de ${selectedXachi.name} y le entregó a Lila. (+${pts} puntos) Pero a ${selectedXachi.name} no le interesa quedarse con ella ni loco, así que decide dársela directamente a Likas.<br><br>🎮 Cómo jugar: elegí piedra, papel o tijera. Necesitás ganar 2 de las 3 rondas contra Likas para que se la lleve.`,
-          "Jugar RPS", startRPS);
+          `Pato llegó a la casita de ${selectedXachi.name} y le entregó a Lila. (+${pts} puntos) Pero a ${selectedXachi.name} no le interesa quedarse con ella ni loco, así que decide dársela directamente a Likas.<br><br>🎮 Cómo jugar: elegí piedra, papel o tijera. Necesitás ganar 2 de las 3 rondas contra Likas para que se la lleve. Tenés 3 intentos totales.`,
+          "Jugar RPS", startRPSFresh);
         return;
       }
     }
@@ -648,9 +650,10 @@ function startLevel3(){
 }
 
 /* ============ LEVEL 4: PIEDRA, PAPEL O TIJERA (mejor de 3) ============ */
+function startRPSFresh(){ rpsAttempts=0; startRPS(); }
 function startRPS(){
   state='rps'; beginLevelTimer();
-  setLevelInfo('Piedra, papel o tijera contra Likas — mejor de 3 rondas. Si ganás 2 rondas, Likas se lleva a Lila.');
+  setLevelInfo(`Piedra, papel o tijera contra Likas — mejor de 3 rondas. Si ganás 2 rondas, Likas se lleva a Lila. Intento ${rpsAttempts+1}/3.`);
   let wins=0, losses=0, round=1;
   const OPTS = [{k:'rock',e:'🪨',beats:'scissors'},{k:'paper',e:'📄',beats:'rock'},{k:'scissors',e:'✂️',beats:'paper'}];
   drawRoundUI();
@@ -696,9 +699,15 @@ function startRPS(){
       const pts = 150 + (clean?100:0);
       totalScore += pts;
       levelScores.push({ name:'RPS vs Likas', pts, timeS:((performance.now()-levelStartTime)/1000).toFixed(1), livesLeft:Math.max(0,lives) });
-      showStory([likas], `${lastRoundText} Ganaste la mejor de 3 (${w}-${l}). (+${pts} puntos) Likas se lleva a Lila a vivir a su casa.<br><br>🎮 Cómo jugar: manejá a Lila con las flechas, comé la comida amarilla hasta llegar a 120 puntos. No choques contra las paredes ni contra vos misma.`,
-        "Continuar", startSnakeLevel);
+      showStory([likas], `${lastRoundText} Ganaste la mejor de 3 (${w}-${l}). (+${pts} puntos) Likas se lleva a Lila a vivir a su casa.<br><br>🎮 Cómo jugar: manejá a Lila con las flechas, comé la comida amarilla hasta llegar a 120 puntos. No choques contra las paredes ni contra vos misma. Tenés 3 intentos totales.`,
+        "Continuar", startSnakeFresh);
     } else {
+      rpsAttempts++;
+      if(rpsAttempts<3){
+        showStory([likas], `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). Intento ${rpsAttempts}/3 fallido — Likas te da revancha.`,
+          "Reintentar", startRPS);
+        return;
+      }
       state='over';
       const img = sceneDataUrl(150,150,(g,w2,h2)=>{
         g.fillStyle='#140808'; g.fillRect(0,0,w2,h2);
@@ -714,9 +723,10 @@ function startRPS(){
 }
 
 /* ============ LEVEL 5: SNAKE — LILA SE ALIMENTA PARA ESCONDERSE ============ */
+function startSnakeFresh(){ snakeAttempts=0; startSnakeLevel(); }
 function startSnakeLevel(){
   state='snake'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 3 — Lila tiene que comer para hibernar y esconderse. Llegá a 120 puntos (cada comida vale 5). Las paredes también son peligrosas, y cuanto más larga te ponés, más fácil comerte a vos misma.');
+  setLevelInfo(`Nivel 3 — Lila tiene que comer para hibernar y esconderse. Llegá a 120 puntos (cada comida vale 5). Las paredes también son peligrosas, y cuanto más larga te ponés, más fácil comerte a vos misma. Intento ${snakeAttempts+1}/3.`);
   const cell=8, cols=Math.floor(W/cell), rows=Math.floor(H/cell);
   let snake=[{x:Math.floor(cols/2),y:Math.floor(rows/2)},{x:Math.floor(cols/2)-1,y:Math.floor(rows/2)},{x:Math.floor(cols/2)-2,y:Math.floor(rows/2)}];
   let dir={x:1,y:0}, nextDir={x:1,y:0};
@@ -741,6 +751,13 @@ function startSnakeLevel(){
       const hitsWall = head.x<0||head.x>=cols||head.y<0||head.y>=rows;
       const hitsSelf = !hitsWall && snake.some(s=>s.x===head.x&&s.y===head.y);
       if(hitsWall || hitsSelf){
+        snakeAttempts++;
+        if(snakeAttempts<3){
+          state='story';
+          showStory([likas], `Lila se chocó y no pudo esconderse (llegó a ${score} puntos). Intento ${snakeAttempts}/3 fallido — probá de nuevo.`,
+            "Reintentar", startSnakeLevel);
+          return;
+        }
         state='over';
         const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
         showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas secas y se escapó. Nunca más la volvieron a ver. Likas lo sigue contratando. Fin del juego.', img, backToTitle);
