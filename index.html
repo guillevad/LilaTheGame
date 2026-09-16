@@ -102,8 +102,6 @@
   <button id="actionBtn">ACCIÓN</button>
 </div>
 
-<footer>Hecho a pedido — pixel art generado en vivo, sin librerías externas.</footer>
-
 <script>
 (function(){
 "use strict";
@@ -243,10 +241,10 @@ const XACHIS = [
   { id:'pipo', name:'Pipo', sprite: makeHuman({hair:'#6b4423', skin:'#f2c9a0', beard:true, beardShort:true, glasses:true}) },
   { id:'facu', name:'Facu', sprite: makeHuman({hair:'#6b4423', skin:'#7a4a28', beard:true}) , special:'Has elegido al hermano de Kida'},
   { id:'marto', name:'Marto', sprite: makeHuman({hair:'#e8c96b', skin:'#f6d7b0', eye:'#3fa9e0'}) },
-  { id:'maxi', name:'Maxi', sprite: makeHuman({hair:'#f6d7b0', skin:'#f6d7b0', bald:true, beard:true, beardThick:true}) },
+  { id:'maxi', name:'Maxi', sprite: makeHuman({hair:'#f6d7b0', skin:'#f6d7b0', bald:true, beard:true, beardThick:true, beardColor:'#141414'}) },
   { id:'pablito', name:'Pablito', sprite: makeHuman({hair:'#141414', skin:'#f2c9a0', beard:true, beardShort:true}) },
   { id:'joaco', name:'Joaco', sprite: makeHuman({hair:'#6b4423', skin:'#f2c9a0', hairLong:true, glasses:true}) },
-  { id:'alex', name:'Alex', sprite: makeHuman({hair:'#4a3222', skin:'#f6d7b0'}) },
+  { id:'alex', name:'Alex', sprite: makeHuman({hair:'#8a6a3a', skin:'#f6d7b0'}) },
   { id:'nico', name:'Nico', sprite: makeHuman({hair:'#6b4423', skin:'#f6d7b0', hairLong:true}) },
   { id:'cantarini', name:'Cantarini', sprite: makeHuman({hair:'#141414', skin:'#f6d7b0', mustache:true}) }
 ];
@@ -439,13 +437,27 @@ function pickedMode(){
 /* ============ LEVEL 1: LA CAZA EN LA PECERA ============ */
 function startLevel1(){
   state='level1'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 1 — Manejá la mano y atrapá a Lila dentro de la pecera. Evitá los corales y los otros peces: cada choque te cuesta una vida. Si perdés todas, Lila logra escapar.');
+  const CATCHES_NEEDED = 3;
+  setLevelInfo('Nivel 1 — Manejá la mano y atrapá a Lila TRES veces dentro de la pecera. Evitá los corales y los otros peces: cada choque te cuesta una vida. Cada vez que la atrapás, se vuelve más rápida y aparecen más peligros. Si perdés todas las vidas, Lila escapa.');
   const bounds={x:20,y:30,w:W-40,h:H-70};
-  const hand={x:W/2,y:bounds.y+20,w:14,h:14};
-  let eel={x:60,y:100,vx:1.4,vy:1.0};
-  const corals=[{x:50,y:bounds.y+bounds.h-30,w:20,h:22},{x:150,y:bounds.y+bounds.h-26,w:24,h:20},{x:210,y:bounds.y+20,w:18,h:20}];
-  const fish=[{x:90,y:60,vx:1.3},{x:180,y:150,vx:-1.1}];
-  let caught=false;
+  const hand={x:W/2,y:bounds.y+20,w:13,h:13};
+  let eelSpeed=1.7;
+  let eel={x:60,y:100,vx:eelSpeed,vy:1.2};
+  const corals=[
+    {x:50,y:bounds.y+bounds.h-30,w:20,h:22},
+    {x:150,y:bounds.y+bounds.h-26,w:24,h:20},
+    {x:210,y:bounds.y+20,w:18,h:20},
+    {x:100,y:bounds.y+18,w:18,h:18}
+  ];
+  const fish=[{x:90,y:60,vx:1.6},{x:180,y:150,vx:-1.5},{x:60,y:130,vx:1.4}];
+  let caught=false, invuln=0, catches=0;
+  let flashText='', flashTimer=0;
+  function respawnEel(){
+    eelSpeed += 0.35;
+    eel = { x: bounds.x+30+Math.random()*(bounds.w-60), y: bounds.y+30+Math.random()*(bounds.h-60), vx: eelSpeed*(Math.random()<0.5?-1:1), vy: eelSpeed*0.7*(Math.random()<0.5?-1:1) };
+    if(catches===1) fish.push({x:bounds.x+20,y:bounds.y+20,vx:1.6});
+    if(catches===2) corals.push({x:bounds.x+bounds.w/2,y:bounds.y+bounds.h/2,w:18,h:18});
+  }
   function loop(){
     ctx.clearRect(0,0,W,H);
     drawWater(ctx, performance.now()/30);
@@ -462,26 +474,40 @@ function startLevel1(){
     eel.x+=eel.vx; eel.y+=eel.vy;
     if(eel.x<bounds.x+10||eel.x>bounds.x+bounds.w-10) eel.vx*=-1;
     if(eel.y<bounds.y+10||eel.y>bounds.y+bounds.h-10) eel.vy*=-1;
-    if(Math.random()<0.01) eel.vx+=(Math.random()-0.5)*0.6;
-    if(Math.random()<0.01) eel.vy+=(Math.random()-0.5)*0.6;
-    eel.vx=Math.max(-2,Math.min(2,eel.vx)); eel.vy=Math.max(-2,Math.min(2,eel.vy));
+    if(Math.random()<0.02) eel.vx+=(Math.random()-0.5)*0.8;
+    if(Math.random()<0.02) eel.vy+=(Math.random()-0.5)*0.8;
+    const maxV = 1.8+eelSpeed*0.5;
+    eel.vx=Math.max(-maxV,Math.min(maxV,eel.vx)); eel.vy=Math.max(-maxV,Math.min(maxV,eel.vy));
     drawEel(ctx, eel.x, eel.y, performance.now()/16, 1.5, eel.vx<0, false);
 
     emoji(ctx,'🖐️', hand.x+7, hand.y+7, 20);
 
     const handBox={x:hand.x,y:hand.y,w:hand.w,h:hand.h};
-    if(!caught && rectsOverlap(handBox,{x:eel.x-8,y:eel.y-6,w:16,h:12})){
-      caught=true;
-      const pts=recordLevelScore('Nivel 1 — La caza');
-      setTimeout(()=>{ showStory([patoSprite],
-        `¡Pato atrapó a Lila! (+${pts} puntos) Ahora tiene que decidir a cuál de sus amigos Xachis se la va a regalar...`,
-        "Elegir Xachi", startXachiSelect); },150);
+    if(!caught && invuln<=0 && rectsOverlap(handBox,{x:eel.x-8,y:eel.y-6,w:16,h:12})){
+      catches++;
+      if(catches>=CATCHES_NEEDED){
+        caught=true;
+        const pts=recordLevelScore('Nivel 1 — La caza');
+        setTimeout(()=>{ showStory([patoSprite],
+          `¡Pato atrapó a Lila las ${CATCHES_NEEDED} veces! (+${pts} puntos) Ahora tiene que decidir a cuál de sus amigos Xachis se la va a regalar...`,
+          "Elegir Xachi", startXachiSelect); },150);
+      } else {
+        totalScore += 25;
+        flashText = `¡Atrapaste a Lila! (${catches}/${CATCHES_NEEDED}) — se pone más rápida...`;
+        flashTimer = 70;
+        invuln=40;
+        respawnEel();
+      }
     }
+    if(invuln>0) invuln--;
     let hit=false;
-    corals.forEach(c=>{ if(rectsOverlap(handBox,c)) hit=true; });
-    fish.forEach(f=>{ if(rectsOverlap(handBox,{x:f.x-8,y:f.y-6,w:16,h:12})) hit=true; });
+    if(invuln<=0){
+      corals.forEach(c=>{ if(rectsOverlap(handBox,c)) hit=true; });
+      fish.forEach(f=>{ if(rectsOverlap(handBox,{x:f.x-8,y:f.y-6,w:16,h:12})) hit=true; });
+    }
     if(hit && !caught){
-      hand.x=W/2; hand.y=bounds.y+20;
+      hand.x=bounds.x+14; hand.y=bounds.y+bounds.h-14;
+      invuln=50;
       const dead = loseLife(()=>{
         const img = sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#123a55'; g.fillRect(0,0,w,h); emoji(g,'🐟',w/2-18,h/2,42); emoji(g,'💨',w/2+22,h/2-14,26); emoji(g,'😤',w/2,20,26); });
         state='over';
@@ -489,7 +515,13 @@ function startLevel1(){
       });
       if(dead) return;
     }
-    setHud(`<span>🎣 ATRAPÁ A LILA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
+    if(flashTimer>0){
+      flashTimer--;
+      ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0, H/2-16, W, 24);
+      ctx.fillStyle='#f2c94c'; ctx.font='9px monospace'; ctx.textAlign='center';
+      ctx.fillText(flashText, W/2, H/2);
+    }
+    setHud(`<span>🎣 ATRAPÁ A LILA ${catches}/${CATCHES_NEEDED}</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
     if(state==='level1') raf=requestAnimationFrame(loop);
   }
   loop();
@@ -516,56 +548,89 @@ function startXachiSelect(){
   });
 }
 
-/* ============ LEVEL 3: PATO CORRE Y SALTA PARA ENTREGAR A LILA ============ */
+/* ============ LEVEL 3: PATO CORRE, SALTA Y ESQUIVA POZOS ============ */
 function startLevel3(){
   state='level3'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 2 — Pato tiene que superar el camino saltando obstáculos para llegar y entregarle Lila a ' + selectedXachi.name + '. Si se queda sin vidas, Lila no lo cuenta.');
-  let distance=0, target=900, groundX=0;
-  let patoY=H-24-18*2, vy=0, onGround=true;
-  const obstacles=[]; let spawnTimer=0;
+  setLevelInfo('Nivel 2 — Pato tiene que cruzar un camino largo lleno de obstáculos y POZOS para llegar y entregarle Lila a ' + selectedXachi.name + '. Saltá justo a tiempo: cuanto más avanzás, más rápido y más difícil se pone. Si se queda sin vidas, Lila no lo cuenta.');
+  let distance=0, target=1900;
+  const groundY=H-24-18*2;
+  let patoY=groundY, vy=0, onGround=true;
+  const hazards=[]; let spawnTimer=40;
+  function currentSpeed(){ return Math.min(4.6, 2.5 + distance/900); }
   function loop(){
+    const speed = currentSpeed();
     ctx.fillStyle='#79c6f2'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#cdeafe'; ctx.fillRect(0,H-60,W,20);
-    drawBank(ctx);
-    groundX-=2.4; distance+=2.4;
+    distance+=speed;
     spawnTimer--;
-    if(spawnTimer<=0){ obstacles.push({x:W+10,w:12,h:16}); spawnTimer=70+Math.random()*40; }
-    if(input.up||input.action){ if(onGround){ vy=-6.4; onGround=false; } }
-    vy+=0.36; patoY+=vy;
-    const groundY=H-24-18*2;
-    if(patoY>=groundY){ patoY=groundY; vy=0; onGround=true; }
+    if(spawnTimer<=0){
+      const isPit = Math.random()<0.4;
+      if(isPit){ hazards.push({type:'pit', x:W+10, w:26+Math.random()*22}); }
+      else { hazards.push({type:'block', x:W+10, w:12+Math.random()*8, h:14+Math.random()*20}); }
+      spawnTimer = Math.max(30, 78 - distance/28) + Math.random()*22;
+    }
+    if((input.up||input.action) && onGround){ vy=-6.7; onGround=false; }
+    vy+=0.37; patoY+=vy;
 
-    obstacles.forEach(o=>o.x-=2.4);
-    while(obstacles.length && obstacles[0].x<-20) obstacles.shift();
-    obstacles.forEach(o=>{ ctx.fillStyle='#8a5a2a'; ctx.fillRect(o.x,H-24-o.h,o.w,o.h); ctx.fillStyle='#6b431e'; ctx.fillRect(o.x,H-24-o.h,o.w,3); });
+    hazards.forEach(hz=>hz.x-=speed);
+    while(hazards.length && hazards[0].x < -60) hazards.shift();
+
+    const patoCenterX = 60+16;
+    const overPit = hazards.some(hz=> hz.type==='pit' && patoCenterX>hz.x-4 && patoCenterX<hz.x+hz.w+4 );
+    if(patoY>=groundY){
+      if(overPit && vy>=0){
+        // keep falling through the pit
+      } else {
+        patoY=groundY; vy=0; onGround=true;
+      }
+    }
+
+    // ground + pit gaps
+    let gx=0;
+    while(gx<W){
+      const pit = hazards.find(hz=> hz.type==='pit' && gx>=hz.x-2 && gx<hz.x+hz.w+2 );
+      if(!pit){ ctx.fillStyle='#3a6b2f'; ctx.fillRect(gx,H-24,10,24); ctx.fillStyle='#2c5522'; ctx.fillRect(gx,H-24,10,4); }
+      else { ctx.fillStyle='#123a55'; ctx.fillRect(gx,H-24,10,24); }
+      gx+=10;
+    }
+    hazards.filter(h=>h.type==='block').forEach(o=>{ ctx.fillStyle='#8a5a2a'; ctx.fillRect(o.x,H-24-o.h,o.w,o.h); ctx.fillStyle='#6b431e'; ctx.fillRect(o.x,H-24-o.h,o.w,3); });
 
     drawSprite(ctx, patoSprite, 60, patoY, 2, false);
     ctx.fillStyle='#bfe8ff'; ctx.fillRect(60+34,patoY+8,14,10);
     ctx.strokeStyle='#333'; ctx.strokeRect(60+34,patoY+8,14,10);
     drawEel(ctx, 60+34+7, patoY+13, performance.now()/16, 0.6, false, false);
 
+    function killPato(){
+      const dead=loseLife(()=>{
+        state='over';
+        const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'😢',w/2,h/2-10,44); emoji(g,'🐟',w/2,h/2+30,26); });
+        showEndScreen('LILA MURIÓ 😢', 'Pato tropezó una vez de más en el camino. Lila no llegó a destino. Fin del juego.', img, backToTitle);
+      });
+      distance=Math.max(0,distance-140);
+      patoY=groundY; vy=0; onGround=true;
+      return dead;
+    }
+
+    if(patoY> H+20){
+      if(killPato()) return;
+    }
     const patoBox={x:60,y:patoY,w:32,h:36};
-    obstacles.forEach(o=>{
-      if(rectsOverlap(patoBox,{x:o.x,y:H-24-o.h,w:o.w,h:o.h})){
+    for(const o of hazards){
+      if(o.type==='block' && rectsOverlap(patoBox,{x:o.x,y:H-24-o.h,w:o.w,h:o.h})){
         o.x=-999;
-        const dead=loseLife(()=>{
-          state='over';
-          const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'😢',w/2,h/2-10,44); emoji(g,'🐟',w/2,h/2+30,26); });
-          showEndScreen('LILA MURIÓ 😢', 'Pato tropezó una vez de más en el camino. Lila no llegó a destino. Fin del juego.', img, backToTitle);
-        });
-        distance=Math.max(0,distance-120);
+        if(killPato()) return;
       }
-    });
+    }
 
     if(distance>=target){
       const pts=recordLevelScore('Nivel 2 — El camino');
       state='story';
       showStory([patoSprite, selectedXachi.sprite],
-        `Pato logró llegar y le entregó a Lila a ${selectedXachi.name}. (+${pts} puntos) Pero ${selectedXachi.name} no la quiere gratis: quiere jugar piedra, papel o tijera contra Likas para ver quién se la queda.`,
+        `Pato logró llegar y le entregó a Lila a ${selectedXachi.name}. (+${pts} puntos) Pero a ${selectedXachi.name} no le interesa quedarse con ella ni loco, así que decide dársela directamente a Likas. Antes de eso, hay que resolverlo con piedra, papel o tijera.`,
         "Jugar RPS", startRPS);
       return;
     }
-    setHud(`<span>🏃 ${selectedXachi.name.toUpperCase()} ESPERA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore}</span>`);
+    setHud(`<span>🏃 ${selectedXachi.name.toUpperCase()} ESPERA</span><span>❤️ x${Math.max(0,lives)} · ⭐ ${totalScore} · ${Math.min(100,Math.floor(distance/target*100))}%</span>`);
     if(state==='level3') raf=requestAnimationFrame(loop);
   }
   loop();
@@ -624,13 +689,15 @@ function startRPS(){
         "Continuar", startSnakeLevel);
     } else {
       state='over';
-      const img = sceneDataUrl(140,140,(g,w2,h2)=>{
-        g.fillStyle='#123a55'; g.fillRect(0,0,w2,h2);
-        g.drawImage(selectedXachi.sprite, w2/2-38, 30, 16*3, 18*3);
-        emoji(g,'❌',w2/2-38+24,30+27,20); emoji(g,'❌',w2/2-38+24,30+27,20);
-        emoji(g,'🔪',w2/2+18,h2/2, 30);
+      const img = sceneDataUrl(150,150,(g,w2,h2)=>{
+        g.fillStyle='#140808'; g.fillRect(0,0,w2,h2);
+        g.strokeStyle='#3a2a2a'; g.lineWidth=4; g.strokeRect(12,30,w2-24,h2-60);
+        g.fillStyle='#7a0f0f'; g.fillRect(14,32,w2-28,h2-64);
+        emoji(g,'🩸', 28, 22, 20); emoji(g,'🩸', w2-28, 22, 20);
+        emoji(g,'🐟', w2/2, h2/2+6, 30);
+        g.drawImage(selectedXachi.sprite, w2-46, h2-46, 16*2, 18*2);
       });
-      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila salta fuera de la pecera y no vuelven a ver a ${selectedXachi.name}. Fin del juego.`, img, backToTitle);
+      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila sale de la pecera y no vuelven a ver a ${selectedXachi.name} nunca más. Fin del juego.`, img, backToTitle);
     }
   }
 }
@@ -638,12 +705,12 @@ function startRPS(){
 /* ============ LEVEL 5: SNAKE — LILA SE ALIMENTA PARA ESCONDERSE ============ */
 function startSnakeLevel(){
   state='snake'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 3 — Lila tiene que comer para hibernar y esconderse. Llegá a 100 puntos (cada comida vale 5). Cuanto más larga, más fácil comerte a vos misma.');
+  setLevelInfo('Nivel 3 — Lila tiene que comer para hibernar y esconderse. Llegá a 120 puntos (cada comida vale 5). Las paredes también son peligrosas, y cuanto más larga te ponés, más fácil comerte a vos misma.');
   const cell=8, cols=Math.floor(W/cell), rows=Math.floor(H/cell);
   let snake=[{x:Math.floor(cols/2),y:Math.floor(rows/2)},{x:Math.floor(cols/2)-1,y:Math.floor(rows/2)},{x:Math.floor(cols/2)-2,y:Math.floor(rows/2)}];
   let dir={x:1,y:0}, nextDir={x:1,y:0};
   let food=spawnFood();
-  let score=0, tick=0, speedDiv=7;
+  let score=0, tick=0, speedDiv=6, TARGET=120;
   function spawnFood(){
     let f;
     do{ f={x:Math.floor(Math.random()*cols), y:Math.floor(Math.random()*rows)}; }
@@ -659,8 +726,10 @@ function startSnakeLevel(){
     tick++;
     if(tick%speedDiv===0){
       dir=nextDir;
-      const head={x:(snake[0].x+dir.x+cols)%cols, y:(snake[0].y+dir.y+rows)%rows};
-      if(snake.some(s=>s.x===head.x&&s.y===head.y)){
+      const head={x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+      const hitsWall = head.x<0||head.x>=cols||head.y<0||head.y>=rows;
+      const hitsSelf = !hitsWall && snake.some(s=>s.x===head.x&&s.y===head.y);
+      if(hitsWall || hitsSelf){
         state='over';
         const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
         showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas tijeras y se escapó. Nunca más la volvieron a ver. Fin del juego.', img, backToTitle);
@@ -669,7 +738,7 @@ function startSnakeLevel(){
       snake.unshift(head);
       if(head.x===food.x && head.y===food.y){
         score+=5; food=spawnFood();
-        if(speedDiv>4 && score%20===0) speedDiv--;
+        if(speedDiv>3 && score%15===0) speedDiv--;
       } else {
         snake.pop();
       }
@@ -679,8 +748,8 @@ function startSnakeLevel(){
     ctx.fillStyle='#f2c94c'; ctx.fillRect(food.x*cell,food.y*cell,cell,cell);
     snake.forEach((s,i)=>{ ctx.fillStyle= i===0? '#e8d24a':'#5fae3d'; ctx.fillRect(s.x*cell+1,s.y*cell+1,cell-2,cell-2); });
 
-    setHud(`<span>🐍 LILA SE ESCONDE</span><span>${score}/100 · ⭐ ${totalScore}</span>`);
-    if(score>=100){
+    setHud(`<span>🐍 LILA SE ESCONDE</span><span>${score}/${TARGET} · ⭐ ${totalScore}</span>`);
+    if(score>=TARGET){
       const pts=recordLevelScore('Nivel 3 — Esconderse');
       state='story';
       showStory([likas], `¡Lila comió suficiente y logró esconderse! Likas cree que la perdió para siempre. (+${pts} puntos)`,
@@ -695,13 +764,13 @@ function startSnakeLevel(){
 /* ============ LEVEL 6: EL CAMINO A LA LAGUNA ============ */
 function startFinalLevel(){
   state='final'; resetLivesForLevel(); beginLevelTimer();
-  setLevelInfo('Nivel 4 — Dos semanas después, Likas decide devolver a Lila a la naturaleza. Esquivá lo que caiga desde arriba en el camino al corredor aeróbico hasta llegar a la laguna.');
-  const lanes=[40,W/2-8,W-56];
+  setLevelInfo('Nivel 4 — Dos semanas después, Likas decide devolver a Lila a la naturaleza. Esquivá lo que caiga desde arriba en el camino al corredor aeróbico hasta llegar a la laguna. Va a ir cada vez más rápido.');
+  const lanes=[30,30+(W-60)/3,30+2*(W-60)/3,W-58];
   let laneIdx=1, cooldown=0;
-  const items=[]; let spawnTimer=0, progress=0, target=1000;
+  const items=[]; let spawnTimer=0, progress=0, target=1500;
   const EMOJIS=['🧍','💃','🚬','💻','📱','🍺','👠','☎️'];
   function loop(){
-    progress += 2.3;
+    progress += 2.1;
     ctx.fillStyle='#2c5522'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#3a6b2f'; ctx.fillRect(lanes[0]-10,0,W-(lanes[0]-10)*2,H);
     for(let i=0;i<3;i++) ctx.fillRect(0,0,0,0);
@@ -714,9 +783,13 @@ function startFinalLevel(){
     spawnTimer--;
     if(spawnTimer<=0){
       items.push({lane:Math.floor(Math.random()*lanes.length), y:-20, e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)]});
-      spawnTimer=42+Math.random()*24;
+      if(Math.random()<0.3){
+        let l2=Math.floor(Math.random()*lanes.length);
+        items.push({lane:l2, y:-50, e:EMOJIS[Math.floor(Math.random()*EMOJIS.length)]});
+      }
+      spawnTimer = Math.max(18, 40-progress/60) + Math.random()*16;
     }
-    items.forEach(it=> it.y += 2.6+progress*0.001 );
+    items.forEach(it=> it.y += 3.0+progress*0.0022 );
     items.forEach(it=> emoji(ctx, it.e, lanes[it.lane]+16, it.y, 22) );
     while(items.length && items[0].y>H+20) items.shift();
 
