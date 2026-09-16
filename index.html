@@ -743,7 +743,7 @@ function startSnakeLevel(){
       if(hitsWall || hitsSelf){
         state='over';
         const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
-        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas tijeras y se escapó. Nunca más la volvieron a ver. Fin del juego.', img, backToTitle);
+        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas secas y se escapó. Nunca más la volvieron a ver. Likas lo sigue contratando. Fin del juego.', img, backToTitle);
         return;
       }
       snake.unshift(head);
