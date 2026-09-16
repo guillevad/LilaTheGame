@@ -697,7 +697,7 @@ function startRPS(){
         emoji(g,'🐟', w2/2, h2/2+6, 30);
         g.drawImage(selectedXachi.sprite, w2-46, h2-46, 16*2, 18*2);
       });
-      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila sale de la pecera y no vuelven a ver a ${selectedXachi.name} nunca más. Fin del juego.`, img, backToTitle);
+      showEndScreen('AMOR… Y TRAICIÓN', `${lastRoundText} Perdiste la mejor de 3 (${w}-${l}). ${selectedXachi.name} se queda con Lila. Se hacen mejores amigos y son felices por un tiempo... hasta que un día Lila sale de la pecera y asesina a ${selectedXachi.name}. Fin del juego.`, img, backToTitle);
     }
   }
 }
@@ -732,7 +732,7 @@ function startSnakeLevel(){
       if(hitsWall || hitsSelf){
         state='over';
         const img=sceneDataUrl(140,140,(g,w,h)=>{ g.fillStyle='#0d1b2a'; g.fillRect(0,0,w,h); emoji(g,'💈',w/2-20,h/2-10,36); emoji(g,'✂️',w/2+22,h/2+10,30); emoji(g,'🐟',w/2-24,h/2+30,26); });
-        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con unas tijeras y se escapó. Nunca más la volvieron a ver. Fin del juego.', img, backToTitle);
+        showEndScreen('EL BARBERO', 'Un día vino el barbero a afeitar y cortarle el pelo a Likas. Mientras él se distraía, el barbero le robó a Lila junto con un frasco de porro y se escapó. Nunca más la volvieron a ver, tampoco a la marimba. Likas lo sigue contratando. Fin del juego.', img, backToTitle);
         return;
       }
       snake.unshift(head);
